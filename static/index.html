@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ AI Soft-NVR 智慧防盜監控中心</title>
+    
+    <!-- 引入高品質字型 (Outfit 與極致科技感的 JetBrains Mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- 載入玻璃擬物風樣式表 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左側導覽列 -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">🛡️</div>
+                <div class="brand-name">
+                    <h1>AI Soft-NVR</h1>
+                    <span>智慧安全防護</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" id="tab-live" data-tab="live-panel">
+                    <span class="nav-icon">👁️</span>即時影像監控
+                </button>
+                <button class="nav-item" id="tab-logs" data-tab="logs-panel">
+                    <span class="nav-icon">📋</span>入侵事件日誌
+                </button>
+                <button class="nav-item" id="tab-playback" data-tab="playback-panel">
+                    <span class="nav-icon">🎥</span>歷史錄影重播
+                </button>
+                <button class="nav-item" id="tab-settings" data-tab="settings-panel">
+                    <span class="nav-icon">⚙️</span>系統參數設定
+                </button>
+            </nav>
+            
+            <div class="system-status">
+                <div class="status-indicator">
+                    <span class="status-dot pulsing"></span>
+                    <span id="system-status-text">引擎監控中</span>
+                </div>
+                <div class="system-time" id="clock">00:00:00</div>
+            </div>
+        </aside>
+
+        <!-- 右側主要工作區域 -->
+        <main class="main-content">
+            <!-- HEADER -->
+            <header class="content-header">
+                <h2 id="panel-title">即時影像監控</h2>
+                <div class="system-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">模式:</span>
+                        <span class="meta-value" id="current-mode-badge">讀取中...</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 1. 即時監控分頁 -->
+            <section id="live-panel" class="tab-panel active">
+                <div class="grid-monitor">
+                    <!-- 左側主螢幕 -->
+                    <div class="card glass monitor-container">
+                        <div class="monitor-header">
+                            <span class="cam-label">CAM 01 - 主警戒區</span>
+                            <div class="rec-badge" id="live-rec-badge">
+                                <span class="rec-dot"></span>● REC
+                            </div>
+                        </div>
+                        <div class="screen-body">
+                            <!-- 用於高性能 Canvas 即時渲染與 AI 邊框疊加 -->
+                            <canvas id="liveCanvas" width="640" height="480"></canvas>
+                            <div class="stream-error-overlay" id="stream-error">
+                                <h3>⚠️ 監控串流已中斷</h3>
+                                <p>嘗試連接 WebSocket 中，請確認伺服器運作正常...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側即時數據與狀態 -->
+                    <div class="card glass stats-panel">
+                        <h3>📊 實時辨識分析</h3>
+                        
+                        <div class="stat-group">
+                            <div class="stat-item">
+                                <div class="stat-lbl">即時偵測目標數</div>
+                                <div class="stat-val num-font" id="stat-objects">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-lbl">監控影像 FPS</div>
+                                <div class="stat-val num-font" id="stat-fps">0</div>
+                            </div>
+                        </div>
+
+                        <div class="progress-container">
+                            <div class="stat-lbl">AI 辨識置信度門檻 (Threshold)</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="conf-threshold-fill" style="width: 50%;"></div>
+                            </div>
+                            <div class="progress-lbl-val" id="conf-threshold-text">50%</div>
+                        </div>
+
+                        <div class="card glass alert-console">
+                            <h4>🚨 即時警報主控台</h4>
+                            <div class="console-body" id="live-alert-console">
+                                <div class="console-placeholder">目前無任何警報事件</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. 事件日誌分頁 -->
+            <section id="logs-panel" class="tab-panel">
+                <div class="card glass full-width">
+                    <div class="section-title-bar">
+                        <h3>📋 入侵安全事件日誌</h3>
+                        <button class="btn btn-secondary" id="btn-refresh-logs">🔄 重新整理</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="event-table">
+                            <thead>
+                                <tr>
+                                    <th>事件 ID</th>
+                                    <th>觸發時間</th>
+                                    <th>辨識類型</th>
+                                    <th>AI 置信度</th>
+                                    <th>警報推播狀態</th>
+                                    <th>動態截圖</th>
+                                    <th>錄影重播</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body">
+                                <tr>
+                                    <td colspan="7" class="loading-text">資料載入中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. 歷史錄影重播分頁 -->
+            <section id="playback-panel" class="tab-panel">
+                <div class="card glass full-width">
+                    <div class="section-title-bar">
+                        <h3>🎥 歷史動態事件錄影檔案 (.mp4)</h3>
+                        <button class="btn btn-secondary" id="btn-refresh-playbacks">🔄 重新整理</button>
+                    </div>
+                    
+                    <div class="playback-grid" id="playback-cards-container">
+                        <!-- 動態產生錄影卡片 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. 系統設定分頁 -->
+            <section id="settings-panel" class="tab-panel">
+                <div class="settings-grid">
+                    <!-- 左半：AI 監控核心設定 -->
+                    <div class="card glass">
+                        <h3>🛡️ 監控與辨識核心</h3>
+                        <hr class="divider"/>
+                        
+                        <div class="form-group">
+                            <label for="set-camera-source">影像監控輸入源</label>
+                            <input type="text" id="set-camera-source" placeholder="請輸入 0 (Webcam) 或 'simulator' (影像模擬) 或 RTSP 串流網址">
+                            <small>無鏡頭時，請輸入 <code>simulator</code> 即可完美體驗！</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="set-detection-threshold">AI 偵測門檻置信度 (Confidence Threshold)</label>
+                            <div class="range-container">
+                                <input type="range" id="set-detection-threshold" min="0.1" max="0.9" step="0.05" value="0.5">
+                                <span id="val-detection-threshold">0.5</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="set-recording-duration">偵測到入侵後錄影秒數 (秒)</label>
+                            <input type="number" id="set-recording-duration" min="5" max="60" value="10">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="set-detection-cooldown">警報冷卻防轟炸時間 (秒)</label>
+                            <input type="number" id="set-detection-cooldown" min="10" max="300" value="30">
+                        </div>
+                    </div>
+
+                    <!-- 右半：警報發送管道設定 -->
+                    <div class="card glass">
+                        <h3>📱 多管道警報推送</h3>
+                        <hr class="divider"/>
+                        
+                        <!-- LINE Notify -->
+                        <div class="alert-section">
+                            <div class="alert-header">
+                                <h4>🟢 LINE Notify 即時通知</h4>
+                                <label class="switch">
+                                    <input type="checkbox" id="set-enable-line">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="alert-inputs" id="line-inputs">
+                                <input type="password" id="set-line-token" placeholder="請貼上您的 LINE Notify 權杖 (Token)">
+                            </div>
+                        </div>
+
+                        <!-- Discord Webhook -->
+                        <div class="alert-section">
+                            <div class="alert-header">
+                                <h4>🔵 Discord Webhook 即時通知</h4>
+                                <label class="switch">
+                                    <input type="checkbox" id="set-enable-discord">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="alert-inputs" id="discord-inputs">
+                                <input type="password" id="set-discord-webhook" placeholder="請貼上 Discord Webhook URL">
+                            </div>
+                        </div>
+
+                        <!-- Email 通知 -->
+                        <div class="alert-section">
+                            <div class="alert-header">
+                                <h4>📧 Email SMTP 安全防護信</h4>
+                                <label class="switch">
+                                    <input type="checkbox" id="set-enable-email">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="alert-inputs" id="email-inputs">
+                                <div class="form-row">
+                                    <input type="text" id="set-email-smtp-server" placeholder="SMTP 伺服器 (例: smtp.gmail.com)">
+                                    <input type="number" id="set-email-smtp-port" placeholder="Port號 (例: 587)">
+                                </div>
+                                <input type="text" id="set-email-sender" placeholder="寄件者信箱 Sender">
+                                <input type="password" id="set-email-password" placeholder="應用程式密碼 / SMTP 密碼">
+                                <input type="text" id="set-email-receiver" placeholder="收件者信箱 Receiver">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定按鈕區 -->
+                <div class="settings-actions">
+                    <button class="btn btn-warning btn-large" id="btn-trigger-test-alert">⚡ 發送測試警報</button>
+                    <button class="btn btn-primary btn-large" id="btn-save-settings">💾 儲存系統設定</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 歷史錄影播放 modal 視窗 (玻璃擬物風) -->
+    <div class="modal" id="video-modal">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h4 id="video-modal-title">重播歷史影片</h4>
+                <button class="close-btn" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <video id="playback-video" controls width="100%"></video>
+            </div>
+        </div>
+    </div>
+
+    <!-- 即時警報跳出提示 (Toast Overlay) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- 載入前端互動腳本 -->
+    <script src="js/app.js"></script>
+</body>
+</html>

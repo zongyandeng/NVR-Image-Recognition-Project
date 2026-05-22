@@ -1,0 +1,16 @@
+{
+    "camera_source": "simulator",
+    "detection_threshold": 0.5,
+    "detection_cooldown": 30,
+    "recording_duration": 10,
+    "line_token": "",
+    "discord_webhook": "",
+    "email_smtp_server": "",
+    "email_smtp_port": 587,
+    "email_sender": "",
+    "email_password": "",
+    "email_receiver": "",
+    "enable_line": false,
+    "enable_discord": false,
+    "enable_email": false
+}
