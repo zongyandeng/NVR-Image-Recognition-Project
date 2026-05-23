@@ -268,7 +268,7 @@ class NVREngine:
                 
                 # 檢查錄影是否超時
                 if time.time() > self.recording_end_time:
-                    self._stop_recording(highest_conf)
+                    self._stop_recording()
             
             self.latest_frame_with_box = annotated_frame
             
@@ -315,16 +315,7 @@ class NVREngine:
             logging.info("警報冷卻中，本次事件不重複發送手機/郵件推播。")
             self._db_log_notified = False
 
-    def _stop_recording(self, confidence):
-        """停止並關閉影片寫入，並寫入資料庫日誌"""
-        self.is_recording = False
-        if self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
-            
-        snapshot_filename = self.recording_filename.replace(".mp4", ".jpg")
-        
-        # 將事件寫入 SQLite 資料庫
+        # 4. 立即將事件寫入 SQLite 資料庫，確保在錄影開始時就記錄，以防異常關機或長時間錄影未結束導致遺失
         log_event(
             event_type="Intruder Detected",
             confidence=confidence,
@@ -332,6 +323,14 @@ class NVREngine:
             video_filename=self.recording_filename,
             is_notified=self._db_log_notified
         )
+
+    def _stop_recording(self):
+        """停止並關閉影片寫入"""
+        self.is_recording = False
+        if self.video_writer is not None:
+            self.video_writer.release()
+            self.video_writer = None
+            
         logging.info(f"動態錄影結束，檔案已儲存: {self.recording_filename}")
 
     def _dispatch_alerts(self, event_type, confidence, snapshot_path):
