@@ -526,6 +526,7 @@ async function loadSystemSettings() {
         document.getElementById("set-detection-threshold").value = settings.detection_threshold;
         document.getElementById("val-detection-threshold").textContent = settings.detection_threshold;
         document.getElementById("set-recording-duration").value = settings.recording_duration;
+        document.getElementById("set-max-recording-duration").value = settings.max_recording_duration;
         document.getElementById("set-detection-cooldown").value = settings.detection_cooldown;
         
         // 填充警報開關
@@ -584,6 +585,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
         camera_source: document.getElementById("set-camera-source").value,
         detection_threshold: parseFloat(document.getElementById("set-detection-threshold").value),
         recording_duration: parseInt(document.getElementById("set-recording-duration").value),
+        max_recording_duration: parseInt(document.getElementById("set-max-recording-duration").value),
         detection_cooldown: parseInt(document.getElementById("set-detection-cooldown").value),
         
         enable_line: document.getElementById("set-enable-line").checked,

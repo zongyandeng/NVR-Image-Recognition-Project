@@ -24,6 +24,7 @@ class SettingsUpdate(BaseModel):
     detection_threshold: float
     detection_cooldown: int
     recording_duration: int
+    max_recording_duration: int
     line_token: str
     discord_webhook: str
     email_smtp_server: str

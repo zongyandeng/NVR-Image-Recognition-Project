@@ -14,6 +14,7 @@ DEFAULT_CONFIG = {
     "detection_threshold": 0.5,         # AI 偵測門檻置信度 (0.0 到 1.0)
     "detection_cooldown": 30,           # 警報冷卻時間 (秒)，防止頻繁轟炸
     "recording_duration": 10,           # 偵測到入侵後的動態錄影長度 (秒)
+    "max_recording_duration": 30,       # 單次錄影的最大時間上限 (秒)
     
     # 警報管道設定
     "line_token": "",                   # LINE Notify 權杖

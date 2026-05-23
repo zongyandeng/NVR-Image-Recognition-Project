@@ -44,6 +44,7 @@ class NVREngine:
         self.video_writer = None
         self.recording_filename = None
         self.recording_end_time = 0
+        self.recording_start_time = 0       # 記錄當下錄影檔的啟動時間，用以做時間上限限制
         self.last_alert_time = 0            # 防止重複警報的冷卻計時器
         
         # 影像模擬器參數 (漂浮的入侵目標)
@@ -266,8 +267,14 @@ class NVREngine:
                     cv2.circle(annotated_frame, (40, 70), 8, (0, 0, 255), -1)
                     cv2.putText(annotated_frame, "REC ACTIVE", (55, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                 
-                # 檢查錄影是否超時
-                if time.time() > self.recording_end_time:
+                # 檢查錄影是否超時，或是達到單次錄影的最大時間上限
+                now = time.time()
+                is_timeout = now > self.recording_end_time
+                is_max_reached = now >= (self.recording_start_time + config.get("max_recording_duration", 30))
+                
+                if is_timeout or is_max_reached:
+                    if is_max_reached:
+                        logging.info(f"已達到單次最大錄影時長 ({config.get('max_recording_duration', 30)} 秒)，自動切換檔案。")
                     self._stop_recording()
             
             self.latest_frame_with_box = annotated_frame
@@ -279,6 +286,7 @@ class NVREngine:
     def _start_recording(self, trigger_frame, confidence):
         """觸發 NVR 錄影事件"""
         self.is_recording = True
+        self.recording_start_time = time.time()
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         

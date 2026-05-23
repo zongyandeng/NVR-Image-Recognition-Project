@@ -183,8 +183,15 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="set-recording-duration">偵測到入侵後錄影秒數 (秒)</label>
+                            <label for="set-recording-duration">偵測到入侵後延伸錄影長度 (秒)</label>
                             <input type="number" id="set-recording-duration" min="5" max="60" value="10">
+                            <small>偵測到物體後，自動延長該長度的錄影時間。</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="set-max-recording-duration">單次錄影最大上限時間 (秒)</label>
+                            <input type="number" id="set-max-recording-duration" min="10" max="300" value="30">
+                            <small>防止長時間偵測導致單個影片檔過大，達上限會自動存檔並繼續開啟新影片錄影。</small>
                         </div>
 
                         <div class="form-group">
