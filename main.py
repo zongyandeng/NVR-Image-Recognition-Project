@@ -4,8 +4,8 @@ import json
 import base64
 import asyncio
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -95,9 +95,9 @@ async def test_alert_api():
 # ==================== 安全檔案服務路由 (防禦 Path Traversal) ====================
 
 @app.get("/api/video/{filename}")
-async def get_video(filename: str):
+async def get_video(filename: str, request: Request):
     """
-    安全地串流播放特定 .mp4 錄影檔案
+    安全地串流播放特定 .mp4 錄影檔案，支援 HTTP 206 範圍請求 (Range Requests)
     【安全防禦】：全面防範 Path Traversal (目錄穿越攻擊)
     """
     # 1. 強制擷取純檔名，防止惡意傳入 ../../../ 等字元
@@ -117,7 +117,51 @@ async def get_video(filename: str):
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Recording video not found")
         
-    return FileResponse(full_path, media_type="video/mp4")
+    file_size = os.path.getsize(full_path)
+    range_header = request.headers.get("range")
+    
+    if not range_header:
+        # 如果瀏覽器沒有要求 Range，則回傳完整的檔案流
+        return FileResponse(full_path, media_type="video/mp4")
+        
+    # 處理 HTTP 206 Range 請求
+    try:
+        # 解析 "bytes=start-end"
+        range_str = range_header.replace("bytes=", "")
+        parts = range_str.split("-")
+        start = int(parts[0]) if parts[0] else 0
+        end = int(parts[1]) if parts[1] else file_size - 1
+        
+        # 確保邊界正確
+        if start >= file_size or end >= file_size or start > end:
+            raise HTTPException(status_code=416, detail="Requested Range Not Satisfiable")
+    except Exception:
+        raise HTTPException(status_code=416, detail="Requested Range Not Satisfiable")
+        
+    # 建立影片區段生成器 (Chunk Generator)
+    def file_chunk_generator(path, start_pos, end_pos, chunk_size=1024*512):
+        with open(path, "rb") as f:
+            f.seek(start_pos)
+            remaining = end_pos - start_pos + 1
+            while remaining > 0:
+                chunk = f.read(min(chunk_size, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+                
+    headers = {
+        "Content-Range": f"bytes {start}-{end}/{file_size}",
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(end - start + 1),
+        "Content-Type": "video/mp4",
+    }
+    
+    return StreamingResponse(
+        file_chunk_generator(full_path, start, end),
+        status_code=206,
+        headers=headers
+    )
 
 @app.get("/api/image/{filename}")
 async def get_image(filename: str):
