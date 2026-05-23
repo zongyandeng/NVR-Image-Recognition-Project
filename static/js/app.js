@@ -446,11 +446,43 @@ function openVideoModal(filename, timestamp) {
     
     // 【安全設計】：安全檔案讀取端點
     playbackVideo.src = `/api/video/${filename}`;
+    playbackVideo.load();
     
     // 顯示 Modal
     videoModal.classList.add("active");
-    playbackVideo.play();
+    
+    // 異步安全播放，避免瀏覽器政策或載入速度過慢引起異常
+    const playPromise = playbackVideo.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.log("自動播放被攔截或載入中，可點擊影片控制列進行播放：", error);
+        });
+    }
 }
+
+// 監聽影片播放錯誤，協助診斷相容性問題
+playbackVideo.addEventListener("error", (e) => {
+    const err = playbackVideo.error;
+    let errMsg = "未知錯誤";
+    if (err) {
+        switch (err.code) {
+            case err.MEDIA_ERR_ABORTED:
+                errMsg = "播放被中止 (Aborted)";
+                break;
+            case err.MEDIA_ERR_NETWORK:
+                errMsg = "網路傳輸錯誤 (Network Error)";
+                break;
+            case err.MEDIA_ERR_DECODE:
+                errMsg = "影片解碼錯誤 (Codec / 解碼失敗)";
+                break;
+            case err.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                errMsg = "影片格式或編碼不被此瀏覽器支援 (Format Not Supported)";
+                break;
+        }
+        console.error("影片播放錯誤: ", err.message, "代碼: ", err.code);
+    }
+    showToast("影片重播失敗", `偵測到瀏覽器錯誤：${errMsg} (代碼: ${err ? err.code : '無'})`, true);
+});
 
 function closeVideoModal() {
     videoModal.classList.remove("active");
