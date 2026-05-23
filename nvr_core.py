@@ -285,8 +285,8 @@ class NVREngine:
         self.recording_filename = f"{timestamp_str}_{unique_id}.mp4"
         video_path = os.path.join(RECORDINGS_DIR, self.recording_filename)
         
-        # 初始化錄影寫入器 (MPEG-4 編碼器)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # 初始化錄影寫入器 (H.264/AVC 編碼器，供瀏覽器原生播放)
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         self.video_writer = cv2.VideoWriter(video_path, fourcc, 20.0, (640, 480))
         
         # 1. 傾倒「前錄緩衝區」內容至影片 (回溯前 5 秒的真相！)
