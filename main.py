@@ -158,6 +158,7 @@ async def websocket_stream(websocket: WebSocket):
                 frame = nvr_engine.latest_frame
                 
             if frame is not None:
+                payload = None
                 try:
                     # 將影像進行 JPEG 壓縮 (品質設為 75，以取得頻寬與解析度的平衡)
                     ret, jpeg_buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
@@ -178,10 +179,12 @@ async def websocket_stream(websocket: WebSocket):
                                 } for obj in nvr_engine.detection_metadata
                             ]
                         }
-                        # 發送 JSON
-                        await websocket.send_json(payload)
                 except Exception as e:
-                    logging.error(f"WebSocket 傳送影格失敗: {e}")
+                    logging.error(f"影像編碼與封包組裝失敗: {e}")
+                
+                if payload is not None:
+                    # 發送 JSON (若連線已中斷將直接拋出異常由外層捕獲，結束此連線迴圈，防止無限 Log 狂飆)
+                    await websocket.send_json(payload)
                     
             # 維持 ~20 FPS 傳輸速度，避免瀏覽器繪製阻塞
             await asyncio.sleep(0.05)
