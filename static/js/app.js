@@ -679,6 +679,8 @@ function updateFenceStatusUI() {
     const saveBtn = document.getElementById("btn-save-fence");
     const toggleSwitch = document.getElementById("fence-toggle-switch");
     
+    if (!statusLabel || !drawBtn || !saveBtn || !toggleSwitch) return;
+    
     if (isDrawingMode) {
         statusLabel.textContent = "繪製中...";
         statusLabel.className = "fence-lbl-drawing";
@@ -780,57 +782,7 @@ function drawFenceOverlay() {
     });
 }
 
-// 綁定電子圍欄互動事件
-document.getElementById("btn-draw-fence").addEventListener("click", toggleDrawingMode);
-
-document.getElementById("btn-clear-fence").addEventListener("click", async () => {
-    fencePoints = [];
-    tempFencePoints = [];
-    isFenceEnabled = false;
-    isDrawingMode = false;
-    document.getElementById("monitor-screen-body").classList.remove("drawing-mode");
-    document.getElementById("fence-toggle-switch").checked = false;
-    updateFenceStatusUI();
-    
-    showToast("電子圍欄已清除", "系統已重置並停用電子圍欄設定。");
-    
-    // 同步重置後端設定
-    await syncFenceSettings(false, []);
-});
-
-document.getElementById("btn-save-fence").addEventListener("click", async () => {
-    if (tempFencePoints.length >= 3) {
-        fencePoints = [...tempFencePoints];
-    }
-    
-    if (fencePoints.length < 3) {
-        showToast("儲存失敗", "圍欄多邊形至少需要 3 個頂點！", true);
-        return;
-    }
-    
-    isFenceEnabled = true;
-    endDrawingMode(false);
-    showToast("圍欄儲存中", "正將電子圍欄座標寫入後端系統設定...");
-    
-    await syncFenceSettings(true, fencePoints);
-});
-
-// 電子圍欄開關切換事件
-document.getElementById("fence-toggle-switch").addEventListener("change", async (e) => {
-    isFenceEnabled = e.target.checked;
-    
-    if (isFenceEnabled && fencePoints.length < 3) {
-        showToast("無法啟用", "尚未繪製圍欄！請先點擊『➕ 繪製』劃定區域。", true);
-        e.target.checked = false;
-        isFenceEnabled = false;
-        return;
-    }
-    
-    updateFenceStatusUI();
-    showToast(isFenceEnabled ? "電子圍欄已啟用" : "電子圍欄已停用", isFenceEnabled ? "AI 將僅針對圍欄內的入侵進行警報過濾。" : "已還原為全域影像辨識模式。");
-    
-    await syncFenceSettings(isFenceEnabled, fencePoints);
-});
+// 綁定電子圍欄互動事件會於下方 DOMContentLoaded 中以安全防禦模式進行初始化綁定
 
 // Canvas 繪圖點擊監聽
 liveCanvas.addEventListener("click", (e) => {
@@ -909,4 +861,66 @@ async function syncFenceSettings(enabled, polygon) {
 document.addEventListener("DOMContentLoaded", () => {
     loadSystemSettings();
     connectWebSocket();
+    
+    // 【高防禦性綁定】：安全將電子圍欄互動事件封裝於 DOM 加載完畢後，並主動做非空校驗，防範未預期的 Uncaught Error 中斷
+    const drawBtn = document.getElementById("btn-draw-fence");
+    if (drawBtn) {
+        drawBtn.addEventListener("click", toggleDrawingMode);
+    }
+    
+    const clearBtn = document.getElementById("btn-clear-fence");
+    if (clearBtn) {
+        clearBtn.addEventListener("click", async () => {
+            fencePoints = [];
+            tempFencePoints = [];
+            isFenceEnabled = false;
+            isDrawingMode = false;
+            const screenBody = document.getElementById("monitor-screen-body");
+            if (screenBody) screenBody.classList.remove("drawing-mode");
+            
+            const toggleSwitch = document.getElementById("fence-toggle-switch");
+            if (toggleSwitch) toggleSwitch.checked = false;
+            
+            updateFenceStatusUI();
+            showToast("電子圍欄已清除", "系統已重置並停用電子圍欄設定。");
+            await syncFenceSettings(false, []);
+        });
+    }
+    
+    const saveBtn = document.getElementById("btn-save-fence");
+    if (saveBtn) {
+        saveBtn.addEventListener("click", async () => {
+            if (tempFencePoints.length >= 3) {
+                fencePoints = [...tempFencePoints];
+            }
+            
+            if (fencePoints.length < 3) {
+                showToast("儲存失敗", "圍欄多邊形至少需要 3 個頂點！", true);
+                return;
+            }
+            
+            isFenceEnabled = true;
+            endDrawingMode(false);
+            showToast("圍欄儲存中", "正將電子圍欄座標寫入後端系統設定...");
+            await syncFenceSettings(true, fencePoints);
+        });
+    }
+    
+    const toggleSwitch = document.getElementById("fence-toggle-switch");
+    if (toggleSwitch) {
+        toggleSwitch.addEventListener("change", async (e) => {
+            isFenceEnabled = e.target.checked;
+            
+            if (isFenceEnabled && fencePoints.length < 3) {
+                showToast("無法啟用", "尚未繪製圍欄！請先點擊『➕ 繪製』劃定區域。", true);
+                e.target.checked = false;
+                isFenceEnabled = false;
+                return;
+            }
+            
+            updateFenceStatusUI();
+            showToast(isFenceEnabled ? "電子圍欄已啟用" : "電子圍欄已停用", isFenceEnabled ? "AI 將僅針對圍欄內的入侵進行警報過濾。" : "已還原為全域影像辨識模式。");
+            await syncFenceSettings(isFenceEnabled, fencePoints);
+        });
+    }
 });
