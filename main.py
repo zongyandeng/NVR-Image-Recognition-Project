@@ -35,6 +35,8 @@ class SettingsUpdate(BaseModel):
     enable_line: bool
     enable_discord: bool
     enable_email: bool
+    enable_fence: bool
+    fence_polygon: list
 
 @app.on_event("startup")
 async def startup_event():

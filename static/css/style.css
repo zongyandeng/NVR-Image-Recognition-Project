@@ -312,6 +312,166 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* ==================== 電子圍欄高科技樣式 (Geofence Premium UI) ==================== */
+.fence-toolbar {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    background: rgba(10, 11, 16, 0.7) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 18px;
+    gap: 12px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    transition: var(--transition-smooth);
+}
+
+.fence-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+/* 電子圍欄專用迷你開關 */
+.fence-switch-container {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+}
+
+.fence-switch-container input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.fence-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .3s;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+}
+
+.fence-slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-secondary);
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.fence-switch-container input:checked + .fence-slider {
+    background-color: rgba(0, 210, 255, 0.2);
+    border-color: rgba(0, 210, 255, 0.4);
+}
+
+.fence-switch-container input:checked + .fence-slider:before {
+    transform: translateX(18px);
+    background-color: var(--accent-blue);
+    box-shadow: 0 0 8px var(--accent-blue-glow);
+}
+
+/* 狀態標籤 */
+#fence-status-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: var(--transition-smooth);
+}
+
+.fence-lbl-disabled {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.fence-lbl-enabled {
+    color: var(--accent-green);
+    background: rgba(0, 230, 118, 0.1);
+    box-shadow: 0 0 8px rgba(0, 230, 118, 0.15);
+}
+
+.fence-lbl-drawing {
+    color: var(--accent-blue);
+    background: rgba(0, 210, 255, 0.1);
+    box-shadow: 0 0 8px rgba(0, 210, 255, 0.15);
+    animation: blink 1.5s infinite ease-in-out;
+}
+
+/* 圍欄按鈕組 */
+.fence-btn-group {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.btn-fence-action {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition-smooth);
+}
+
+.btn-fence-action:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.btn-fence-action:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.btn-fence-action:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-fence-action.active {
+    background: rgba(0, 210, 255, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    box-shadow: 0 0 10px var(--accent-blue-glow);
+}
+
+/* Canvas 在繪圖模式下的發光外框 */
+.screen-body.drawing-mode {
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 20px var(--accent-blue-glow) !important;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 #liveCanvas {
     width: 100%;
     height: 100%;

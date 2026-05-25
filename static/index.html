@@ -73,7 +73,21 @@
                                 <span class="rec-dot"></span>● REC
                             </div>
                         </div>
-                        <div class="screen-body">
+                        <div class="screen-body" id="monitor-screen-body">
+                            <!-- 智慧電子圍欄高科技工具列 (Cyberpunk Glass Toolbar) -->
+                            <div class="fence-toolbar" id="live-fence-toolbar">
+                                <span class="fence-title">🛡️ 智慧電子圍欄</span>
+                                <label class="fence-switch-container">
+                                    <input type="checkbox" id="fence-toggle-switch">
+                                    <span class="fence-slider"></span>
+                                </label>
+                                <span id="fence-status-label" class="fence-lbl-disabled">已停用</span>
+                                <div class="fence-btn-group">
+                                    <button class="btn-fence-action" id="btn-draw-fence" title="開始繪製圍欄多邊形">➕ 繪製</button>
+                                    <button class="btn-fence-action" id="btn-clear-fence" title="清除已畫的頂點">🧹 清除</button>
+                                    <button class="btn-fence-action" id="btn-save-fence" title="儲存並套用圍欄設定" disabled>💾 儲存</button>
+                                </div>
+                            </div>
                             <!-- 用於高性能 Canvas 即時渲染與 AI 邊框疊加 -->
                             <canvas id="liveCanvas" width="640" height="480"></canvas>
                             <div class="stream-error-overlay" id="stream-error">

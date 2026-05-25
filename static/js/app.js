@@ -5,6 +5,14 @@ let fpsLastTime = performance.now();
 let fpsFrames = 0;
 let isRecordingState = false; // 用於紀錄錄影狀態切換觸發 UI Toast
 
+// 智慧電子圍欄狀態變數
+let isFenceEnabled = false;
+let fencePoints = [];         // 已儲存的比例座標頂點 [[x, y], ...]
+let tempFencePoints = [];     // 繪製中的比例座標頂點
+let isDrawingMode = false;
+let mouseX = 0, mouseY = 0;   // 滑鼠在 Canvas 中的實時座標
+
+
 // DOM 元素選取
 const liveCanvas = document.getElementById("liveCanvas");
 const ctx = liveCanvas.getContext("2d");
@@ -134,6 +142,8 @@ function connectWebSocket() {
                 const img = new Image();
                 img.onload = () => {
                     ctx.drawImage(img, 0, 0, liveCanvas.width, liveCanvas.height);
+                    // 影像繪製完畢後，動態疊加前端繪製中的電子圍欄多邊形
+                    drawFenceOverlay();
                 };
                 img.src = data.image;
             }
@@ -552,6 +562,12 @@ async function loadSystemSettings() {
         document.getElementById("conf-threshold-fill").style.width = `${settings.detection_threshold * 100}%`;
         document.getElementById("conf-threshold-text").textContent = `${settings.detection_threshold * 100}%`;
         
+        // 載入電子圍欄設定
+        isFenceEnabled = settings.enable_fence || false;
+        fencePoints = settings.fence_polygon || [];
+        document.getElementById("fence-toggle-switch").checked = isFenceEnabled;
+        updateFenceStatusUI();
+        
     } catch (err) {
         console.error("自伺服器讀取設定檔失敗: ", err);
         showToast("讀取設定失敗", "無法自背景加載設定檔，改用網頁預設值。", true);
@@ -598,7 +614,11 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
         email_smtp_port: parseInt(document.getElementById("set-email-smtp-port").value) || 587,
         email_sender: document.getElementById("set-email-sender").value,
         email_password: document.getElementById("set-email-password").value,
-        email_receiver: document.getElementById("set-email-receiver").value
+        email_receiver: document.getElementById("set-email-receiver").value,
+        
+        // 智慧電子圍欄
+        enable_fence: document.getElementById("fence-toggle-switch").checked,
+        fence_polygon: fencePoints
     };
     
     try {
@@ -650,7 +670,241 @@ document.getElementById("btn-trigger-test-alert").addEventListener("click", asyn
     }
 });
 
-// ==================== 8. 程式進入點初始化 ====================
+// ==================== 8. 智慧電子圍欄互動模組 (Geofence Controller) ====================
+
+// 更新電子圍欄 UI 狀態與標籤
+function updateFenceStatusUI() {
+    const statusLabel = document.getElementById("fence-status-label");
+    const drawBtn = document.getElementById("btn-draw-fence");
+    const saveBtn = document.getElementById("btn-save-fence");
+    const toggleSwitch = document.getElementById("fence-toggle-switch");
+    
+    if (isDrawingMode) {
+        statusLabel.textContent = "繪製中...";
+        statusLabel.className = "fence-lbl-drawing";
+        drawBtn.textContent = "🚫 取消";
+        drawBtn.classList.add("active");
+        saveBtn.disabled = tempFencePoints.length < 3;
+    } else {
+        drawBtn.textContent = "➕ 繪製";
+        drawBtn.classList.remove("active");
+        
+        if (isFenceEnabled) {
+            statusLabel.textContent = "已啟用";
+            statusLabel.className = "fence-lbl-enabled";
+            toggleSwitch.checked = true;
+        } else {
+            statusLabel.textContent = "已停用";
+            statusLabel.className = "fence-lbl-disabled";
+            toggleSwitch.checked = false;
+        }
+        
+        saveBtn.disabled = true;
+    }
+}
+
+// 進入或退出繪圖模式
+function toggleDrawingMode() {
+    if (isDrawingMode) {
+        endDrawingMode(false); // 取消繪製
+    } else {
+        isDrawingMode = true;
+        tempFencePoints = [];
+        document.getElementById("monitor-screen-body").classList.add("drawing-mode");
+        showToast("進入圍欄繪製模式", "在監視畫面上點擊定點，最後點擊『首點』或點擊『儲存』以閉合多邊形。");
+        updateFenceStatusUI();
+    }
+}
+
+// 結束繪圖模式
+function endDrawingMode(shouldSavePoints = false) {
+    isDrawingMode = false;
+    document.getElementById("monitor-screen-body").classList.remove("drawing-mode");
+    
+    if (shouldSavePoints && tempFencePoints.length >= 3) {
+        fencePoints = [...tempFencePoints];
+        document.getElementById("btn-save-fence").disabled = false;
+    }
+    
+    tempFencePoints = [];
+    updateFenceStatusUI();
+}
+
+// 繪製 Canvas 電子圍欄疊加層
+function drawFenceOverlay() {
+    if (!isDrawingMode || tempFencePoints.length === 0) return;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(0, 210, 255, 0.85)"; // 發光科技藍
+    ctx.lineWidth = 2;
+    
+    // 移動到第一個頂點
+    const firstX = tempFencePoints[0][0] * liveCanvas.width;
+    const firstY = tempFencePoints[0][1] * liveCanvas.height;
+    ctx.moveTo(firstX, firstY);
+    
+    // 繪製各個頂點間的線段
+    for (let i = 1; i < tempFencePoints.length; i++) {
+        ctx.lineTo(tempFencePoints[i][0] * liveCanvas.width, tempFencePoints[i][1] * liveCanvas.height);
+    }
+    
+    // 繪製連接到滑鼠位置的輔助虛線
+    ctx.lineTo(mouseX, mouseY);
+    
+    ctx.setLineDash([5, 5]); // 設定為虛線
+    ctx.stroke();
+    ctx.setLineDash([]);    // 還原為實線
+    
+    // 繪製頂點圓圈
+    tempFencePoints.forEach((pt, idx) => {
+        const ptX = pt[0] * liveCanvas.width;
+        const ptY = pt[1] * liveCanvas.height;
+        
+        ctx.beginPath();
+        ctx.arc(ptX, ptY, 6, 0, 2 * Math.PI);
+        if (idx === 0) {
+            // 首點用霓虹紅標記，方便閉合
+            ctx.fillStyle = "#ff1744";
+            ctx.shadowColor = "rgba(255, 23, 68, 0.5)";
+            ctx.shadowBlur = 10;
+        } else {
+            ctx.fillStyle = "#00d2ff";
+            ctx.shadowColor = "rgba(0, 210, 255, 0.5)";
+            ctx.shadowBlur = 10;
+        }
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.shadowBlur = 0; // 還原 shadow
+    });
+}
+
+// 綁定電子圍欄互動事件
+document.getElementById("btn-draw-fence").addEventListener("click", toggleDrawingMode);
+
+document.getElementById("btn-clear-fence").addEventListener("click", async () => {
+    fencePoints = [];
+    tempFencePoints = [];
+    isFenceEnabled = false;
+    isDrawingMode = false;
+    document.getElementById("monitor-screen-body").classList.remove("drawing-mode");
+    document.getElementById("fence-toggle-switch").checked = false;
+    updateFenceStatusUI();
+    
+    showToast("電子圍欄已清除", "系統已重置並停用電子圍欄設定。");
+    
+    // 同步重置後端設定
+    await syncFenceSettings(false, []);
+});
+
+document.getElementById("btn-save-fence").addEventListener("click", async () => {
+    if (tempFencePoints.length >= 3) {
+        fencePoints = [...tempFencePoints];
+    }
+    
+    if (fencePoints.length < 3) {
+        showToast("儲存失敗", "圍欄多邊形至少需要 3 個頂點！", true);
+        return;
+    }
+    
+    isFenceEnabled = true;
+    endDrawingMode(false);
+    showToast("圍欄儲存中", "正將電子圍欄座標寫入後端系統設定...");
+    
+    await syncFenceSettings(true, fencePoints);
+});
+
+// 電子圍欄開關切換事件
+document.getElementById("fence-toggle-switch").addEventListener("change", async (e) => {
+    isFenceEnabled = e.target.checked;
+    
+    if (isFenceEnabled && fencePoints.length < 3) {
+        showToast("無法啟用", "尚未繪製圍欄！請先點擊『➕ 繪製』劃定區域。", true);
+        e.target.checked = false;
+        isFenceEnabled = false;
+        return;
+    }
+    
+    updateFenceStatusUI();
+    showToast(isFenceEnabled ? "電子圍欄已啟用" : "電子圍欄已停用", isFenceEnabled ? "AI 將僅針對圍欄內的入侵進行警報過濾。" : "已還原為全域影像辨識模式。");
+    
+    await syncFenceSettings(isFenceEnabled, fencePoints);
+});
+
+// Canvas 繪圖點擊監聽
+liveCanvas.addEventListener("click", (e) => {
+    if (!isDrawingMode) return;
+    
+    const rect = liveCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 轉為 0.0 ~ 1.0 比例
+    const relX = parseFloat((x / liveCanvas.width).toFixed(4));
+    const relY = parseFloat((y / liveCanvas.height).toFixed(4));
+    
+    // 檢查首點閉合碰撞 (距離小於 12 像素視為點擊首點)
+    if (tempFencePoints.length >= 3) {
+        const firstX = tempFencePoints[0][0] * liveCanvas.width;
+        const firstY = tempFencePoints[0][1] * liveCanvas.height;
+        const dist = Math.hypot(x - firstX, y - firstY);
+        
+        if (dist < 12) {
+            showToast("多邊形閉合成功", "圍欄劃定完成！可點擊『💾 儲存』將設定儲存生效。");
+            endDrawingMode(true);
+            return;
+        }
+    }
+    
+    // 限制最大頂點數
+    if (tempFencePoints.length >= 8) {
+        showToast("點數達到上限", "為確保後端效能，圍欄最大支援 8 個頂點，請點擊紅色首點進行閉合。", true);
+        return;
+    }
+    
+    tempFencePoints.push([relX, relY]);
+    updateFenceStatusUI();
+});
+
+// Canvas 繪圖滑鼠移動監聽
+liveCanvas.addEventListener("mousemove", (e) => {
+    if (!isDrawingMode) return;
+    const rect = liveCanvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+});
+
+// 異步同步電子圍欄設定至後端
+async function syncFenceSettings(enabled, polygon) {
+    try {
+        // 先讀取當前設定以保留其他欄位
+        const rGet = await fetch("/api/settings");
+        const curSettings = await rGet.json();
+        
+        // 覆蓋電子圍欄設定
+        curSettings.enable_fence = enabled;
+        curSettings.fence_polygon = polygon;
+        
+        const rPost = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(curSettings)
+        });
+        
+        if (rPost.ok) {
+            showToast("電子圍欄同步成功", "設定已寫入系統核心，即時生效！");
+            loadSystemSettings(); // 重新整理前端顯示
+        } else {
+            showToast("同步失敗", "寫入設定時伺服器拒絕請求。", true);
+        }
+    } catch (err) {
+        console.error("同步圍欄設定失敗:", err);
+        showToast("連線異常", "無法與後端伺服器進行設定同步。", true);
+    }
+}
+
+// ==================== 9. 程式進入點初始化 ====================
 
 document.addEventListener("DOMContentLoaded", () => {
     loadSystemSettings();

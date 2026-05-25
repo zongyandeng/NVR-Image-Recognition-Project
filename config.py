@@ -11,6 +11,9 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.j
 # 預設系統設定
 DEFAULT_CONFIG = {
     "camera_source": "simulator",       # "simulator" (內建影像模擬), 0 (本機鏡頭), 或 "rtsp://..." (RTSP 串流/影片路徑)
+    "enable_fence": False,              # 是否啟用電子圍欄
+    "fence_polygon": [],                # 電子圍欄相對比例頂點 [[x1, y1], [x2, y2], ...]
+
     "detection_threshold": 0.5,         # AI 偵測門檻置信度 (0.0 到 1.0)
     "detection_cooldown": 30,           # 警報冷卻時間 (秒)，防止頻繁轟炸
     "recording_duration": 10,           # 偵測到入侵後的動態錄影長度 (秒)
@@ -95,6 +98,8 @@ class ConfigManager:
                             self._config[key] = int(value)
                         elif expected_type == float:
                             self._config[key] = float(value)
+                        elif expected_type == list:
+                            self._config[key] = list(value)
                         else:
                             # 針對相機源，若是數字字串 (例如 "0")，自動轉成 int 以利 OpenCV 讀取 Webcam
                             if key == "camera_source" and str(value).isdigit():

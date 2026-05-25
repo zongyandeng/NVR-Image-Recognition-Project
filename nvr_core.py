@@ -99,10 +99,16 @@ class NVREngine:
         for y in range(0, 480, grid_size):
             cv2.line(frame, (0, y), (640, y), (35, 38, 48), 1)
             
-        # 繪製警戒區 (Red Warning Zone) - 畫面右側大區域
-        cv2.rectangle(frame, (320, 80), (600, 400), (0, 0, 80), -1) # 半透暗紅背景
-        cv2.rectangle(frame, (320, 80), (600, 400), (0, 0, 200), 2)  # 紅色邊框
-        cv2.putText(frame, "WARNING ZONE", (330, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        enable_fence = config.get("enable_fence", False)
+        fence_poly = config.get("fence_polygon", [])
+        
+        # 若未啟用電子圍欄，則繪製預設警戒區
+        if not (enable_fence and len(fence_poly) >= 3):
+            # 繪製警戒區 (Red Warning Zone) - 畫面右側大區域
+            cv2.rectangle(frame, (320, 80), (600, 400), (0, 0, 80), -1) # 半透暗紅背景
+            cv2.rectangle(frame, (320, 80), (600, 400), (0, 0, 200), 2)  # 紅色邊框
+            cv2.putText(frame, "WARNING ZONE", (330, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
         
         # 更新模擬「入侵者」物體的移動軌跡
         self.sim_x += self.sim_dx
@@ -160,8 +166,25 @@ class NVREngine:
         else:
             # A. 針對內建「影像模擬產生器」的特別處理
             if config.get("camera_source") == "simulator":
-                # 當模擬入侵者球體進入右側「警戒區」(X > 320 且 80 < Y < 400) 時觸發偵測
-                if self.sim_x > 320 and 80 < self.sim_y < 400:
+                enable_fence = config.get("enable_fence", False)
+                fence_poly = config.get("fence_polygon", [])
+                
+                is_inside = False
+                if enable_fence and len(fence_poly) >= 3:
+                    # 判斷綠球中心是否在多邊形內
+                    points = []
+                    for pt in fence_poly:
+                        points.append([int(pt[0] * 640), int(pt[1] * 480)])
+                    pts = np.array(points, dtype=np.int32)
+                    dist = cv2.pointPolygonTest(pts, (self.sim_x, self.sim_y), False)
+                    if dist >= 0:
+                        is_inside = True
+                else:
+                    # 當模擬入侵者球體進入右側「警戒區」(X > 320 且 80 < Y < 400) 時觸發偵測
+                    if self.sim_x > 320 and 80 < self.sim_y < 400:
+                        is_inside = True
+                
+                if is_inside:
                     detected_boxes.append({
                         "box": (self.sim_x - 30, self.sim_y - 30, 60, 60),
                         "label": "Intruder (Simulated) 0.95",
@@ -230,29 +253,103 @@ class NVREngine:
             
             # 執行影像辨識
             detected_boxes, highest_conf = self._detect_objects(frame)
+            
+            # 電子圍欄入侵判定
+            enable_fence = config.get("enable_fence", False)
+            fence_poly = config.get("fence_polygon", [])
+            
+            intrusion_detected = False
+            polygon_contour = None
+            
+            if enable_fence and len(fence_poly) >= 3:
+                points = []
+                for pt in fence_poly:
+                    points.append([int(pt[0] * 640), int(pt[1] * 480)])
+                polygon_contour = np.array(points, dtype=np.int32)
+                
+            # 標記各偵測目標是否進入電子圍欄
+            for obj in detected_boxes:
+                x, y, w, h = obj["box"]
+                if polygon_contour is not None:
+                    # 計算腳步基準點 (底邊中點)
+                    feet_point = (int(x + w / 2), int(y + h))
+                    dist = cv2.pointPolygonTest(polygon_contour, feet_point, False)
+                    obj["in_fence"] = dist >= 0
+                    if obj["in_fence"]:
+                        intrusion_detected = True
+                else:
+                    obj["in_fence"] = True
+                    intrusion_detected = True
+                    
             self.detection_metadata = detected_boxes
             
             # 繪製 AI 發光邊框於 live 影格
             annotated_frame = frame.copy()
             for obj in detected_boxes:
                 x, y, w, h = obj["box"]
-                # 繪製具發光感的電子藍邊框 (Cyber Blue)
-                cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (255, 180, 0), 2)
-                cv2.rectangle(annotated_frame, (x - 1, y - 1), (x + w + 1, y + h + 1), (255, 230, 100), 1)
+                is_in = obj.get("in_fence", True)
+                
+                # 圍欄內使用發光橙色，圍欄外使用綠色
+                box_color = (255, 180, 0) if is_in else (0, 255, 0)
+                
+                # 繪製邊框
+                cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), box_color, 2)
+                cv2.rectangle(annotated_frame, (x - 1, y - 1), (x + w + 1, y + h + 1), box_color, 1)
                 
                 # 繪製文字標籤背景
-                cv2.rectangle(annotated_frame, (x, y - 25), (x + 180, y), (255, 180, 0), -1)
-                cv2.putText(annotated_frame, obj["label"], (x + 5, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (10, 15, 20), 2)
+                cv2.rectangle(annotated_frame, (x, y - 25), (x + 180, y), box_color, -1)
+                label_text = obj["label"]
+                if enable_fence and not is_in:
+                    label_text += " (Outside)"
+                cv2.putText(annotated_frame, label_text, (x + 5, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (10, 15, 20), 2)
+                
+            # 繪製多邊形電子圍欄
+            if enable_fence and len(fence_poly) >= 3:
+                points = []
+                for pt in fence_poly:
+                    points.append([int(pt[0] * 640), int(pt[1] * 480)])
+                pts = np.array(points, dtype=np.int32).reshape((-1, 1, 2))
+                
+                if intrusion_detected:
+                    # 霓虹紅閃爍效果
+                    pulse = int(time.time() * 5) % 2
+                    fence_color = (0, 0, 255) if pulse == 0 else (0, 0, 180)
+                    line_thickness = 3
+                    
+                    # 畫面頂部警告橫幅
+                    cv2.rectangle(annotated_frame, (0, 0), (640, 40), (0, 0, 150), -1)
+                    cv2.putText(annotated_frame, "WARNING: INTRUSION DETECTED", (140, 27), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                else:
+                    fence_color = (0, 255, 100) # 極光綠
+                    line_thickness = 1
+                    
+                # 繪製半透明多邊形填充
+                overlay = annotated_frame.copy()
+                fill_color = (0, 0, 100) if intrusion_detected else (0, 100, 0)
+                cv2.fillPoly(overlay, [pts], fill_color)
+                cv2.addWeighted(overlay, 0.15, annotated_frame, 0.85, 0, annotated_frame)
+                
+                # 繪製多邊形外框與頂點發光圓點
+                cv2.polylines(annotated_frame, [pts], True, fence_color, line_thickness)
+                for pt in points:
+                    cv2.circle(annotated_frame, (pt[0], pt[1]), 5, fence_color, -1)
+                    cv2.circle(annotated_frame, (pt[0], pt[1]), 7, (255, 255, 255), 1)
                 
             # NVR 動態事件錄影邏輯
-            if len(detected_boxes) > 0:
+            # 判斷是否滿足觸發警報條件 (啟用圍欄時，必須有在圍欄內的目標)
+            trigger_alert = intrusion_detected if (enable_fence and len(fence_poly) >= 3) else (len(detected_boxes) > 0)
+            
+            if trigger_alert:
                 # 偵測到入侵！
                 now = time.time()
                 self.recording_end_time = now + config.get("recording_duration", 10)
                 
                 if not self.is_recording:
+                    # 取得在圍欄內目標的最高置信度
+                    fence_confs = [obj["conf"] for obj in detected_boxes if obj.get("in_fence", False)]
+                    trigger_conf = max(fence_confs) if fence_confs else highest_conf
                     # 啟動錄影！
-                    self._start_recording(frame, highest_conf)
+                    self._start_recording(frame, trigger_conf)
             
             # 如果錄影中，將影格寫入影片
             if self.is_recording:
