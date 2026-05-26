@@ -8,7 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Requ
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from config import config
 from database import get_events
@@ -21,7 +21,7 @@ app = FastAPI(title="AI Soft-NVR Surveillance System")
 
 # 警報測試資料模型
 class SettingsUpdate(BaseModel):
-    camera_source: Optional[str] = None
+    camera_source: Optional[Union[str, int]] = None
     detection_threshold: Optional[float] = None
     detection_cooldown: Optional[int] = None
     recording_duration: Optional[int] = None
