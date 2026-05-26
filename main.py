@@ -196,7 +196,7 @@ async def get_video(filename: str, request: Request):
 async def get_image(filename: str):
     """
     安全地提供警報事件截圖預覽
-    【安全防禦】：全面防範 Path Traversal (目錄穿越攻擊)
+    【安全防禦】：防範 Path Traversal 穿越攻擊；若實體檔案遺失，自動渲染高科技感佔位圖防範 404 報錯與前端破圖！
     """
     safe_filename = os.path.basename(filename)
     full_path = os.path.abspath(os.path.join(SNAPSHOTS_DIR, safe_filename))
@@ -206,9 +206,30 @@ async def get_image(filename: str):
         logging.warning(f"偵測到目錄穿越攻擊企圖！請求路徑: {filename}")
         raise HTTPException(status_code=403, detail="Forbidden: Access Denied")
         
+    # 若截圖檔案遺失（例如歷史紀錄被刪除），自動動態渲染高科技感佔位圖
     if not os.path.exists(full_path):
-        raise HTTPException(status_code=404, detail="Snapshot image not found")
+        import numpy as np
+        # 建立一個 320x180 (16:9) 的高科技深灰背景
+        placeholder = np.zeros((180, 320, 3), dtype=np.uint8)
+        placeholder[:] = (20, 22, 28) # 深暗色背景
         
+        # 畫上高科技裝飾格線
+        cv2.rectangle(placeholder, (5, 5), (315, 175), (45, 48, 58), 1)
+        cv2.line(placeholder, (5, 5), (25, 5), (0, 210, 255), 2)
+        cv2.line(placeholder, (5, 5), (5, 25), (0, 210, 255), 2)
+        
+        # 繪製文字 (若無法顯示中文，用英文字體確保相容)
+        cv2.putText(placeholder, "AI Soft-NVR", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 210, 255), 1)
+        cv2.putText(placeholder, "SNAPSHOT MISSING", (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 120), 1)
+        cv2.putText(placeholder, "File Not Found (404)", (20, 135), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 80, 95), 1)
+        
+        # 編碼為 JPEG
+        ret, jpeg_buffer = cv2.imencode('.jpg', placeholder)
+        if ret:
+            from fastapi.responses import Response
+            return Response(content=jpeg_buffer.tobytes(), media_type="image/jpeg")
+            
+        raise HTTPException(status_code=404, detail="Snapshot image not found")
     return FileResponse(full_path, media_type="image/jpeg")
 
 # ==================== WebSocket 即時串流服務 ====================
