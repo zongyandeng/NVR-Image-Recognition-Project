@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Requ
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional, List
 
 from config import config
 from database import get_events
@@ -20,23 +21,23 @@ app = FastAPI(title="AI Soft-NVR Surveillance System")
 
 # 警報測試資料模型
 class SettingsUpdate(BaseModel):
-    camera_source: str
-    detection_threshold: float
-    detection_cooldown: int
-    recording_duration: int
-    max_recording_duration: int
-    line_token: str
-    discord_webhook: str
-    email_smtp_server: str
-    email_smtp_port: int
-    email_sender: str
-    email_password: str
-    email_receiver: str
-    enable_line: bool
-    enable_discord: bool
-    enable_email: bool
-    enable_fence: bool
-    fence_polygon: list
+    camera_source: Optional[str] = None
+    detection_threshold: Optional[float] = None
+    detection_cooldown: Optional[int] = None
+    recording_duration: Optional[int] = None
+    max_recording_duration: Optional[int] = None
+    line_token: Optional[str] = None
+    discord_webhook: Optional[str] = None
+    email_smtp_server: Optional[str] = None
+    email_smtp_port: Optional[int] = None
+    email_sender: Optional[str] = None
+    email_password: Optional[str] = None
+    email_receiver: Optional[str] = None
+    enable_line: Optional[bool] = None
+    enable_discord: Optional[bool] = None
+    enable_email: Optional[bool] = None
+    enable_fence: Optional[bool] = None
+    fence_polygon: Optional[List] = None
 
 @app.on_event("startup")
 async def startup_event():

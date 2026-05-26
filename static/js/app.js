@@ -560,7 +560,7 @@ async function loadSystemSettings() {
         
         // 更新即時監控分頁的置信度門檻指示
         document.getElementById("conf-threshold-fill").style.width = `${settings.detection_threshold * 100}%`;
-        document.getElementById("conf-threshold-text").textContent = `${settings.detection_threshold * 100}%`;
+        document.getElementById("conf-threshold-text").textContent = `${Math.round(settings.detection_threshold * 100)}%`;
         
         // 載入電子圍欄設定
         isFenceEnabled = settings.enable_fence || false;
@@ -789,20 +789,23 @@ liveCanvas.addEventListener("click", (e) => {
     if (!isDrawingMode) return;
     
     const rect = liveCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    
+    // 【高精度校正】：將相對於網頁 CSS 的實際滑鼠位置 (e.clientX/clientY)
+    // 除以 Canvas 的實際顯示寬高 (rect.width/height) 取得正確比例，再乘以 640x480 對齊內建維度，徹底消滅位移誤差
+    const x = ((e.clientX - rect.left) / rect.width) * liveCanvas.width;
+    const y = ((e.clientY - rect.top) / rect.height) * liveCanvas.height;
     
     // 轉為 0.0 ~ 1.0 比例
     const relX = parseFloat((x / liveCanvas.width).toFixed(4));
     const relY = parseFloat((y / liveCanvas.height).toFixed(4));
     
-    // 檢查首點閉合碰撞 (距離小於 12 像素視為點擊首點)
+    // 檢查首點閉合碰撞 (距離小於 15 像素視為點擊首點)
     if (tempFencePoints.length >= 3) {
         const firstX = tempFencePoints[0][0] * liveCanvas.width;
         const firstY = tempFencePoints[0][1] * liveCanvas.height;
         const dist = Math.hypot(x - firstX, y - firstY);
         
-        if (dist < 12) {
+        if (dist < 15) {
             showToast("多邊形閉合成功", "圍欄劃定完成！可點擊『💾 儲存』將設定儲存生效。");
             endDrawingMode(true);
             return;
@@ -823,8 +826,10 @@ liveCanvas.addEventListener("click", (e) => {
 liveCanvas.addEventListener("mousemove", (e) => {
     if (!isDrawingMode) return;
     const rect = liveCanvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    
+    // 同樣將滑鼠實時位置等比例映射回 640x480 的畫布刻度空間，讓輔助虛線 100% 緊貼滑鼠針尖
+    mouseX = ((e.clientX - rect.left) / rect.width) * liveCanvas.width;
+    mouseY = ((e.clientY - rect.top) / rect.height) * liveCanvas.height;
 });
 
 // 異步同步電子圍欄設定至後端

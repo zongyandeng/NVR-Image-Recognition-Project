@@ -88,7 +88,7 @@ class ConfigManager:
         """安全地批量更新設定，並回寫檔案"""
         with self._lock:
             for key, value in new_settings.items():
-                if key in DEFAULT_CONFIG:
+                if key in DEFAULT_CONFIG and value is not None:
                     # 類型檢查與轉換
                     expected_type = type(DEFAULT_CONFIG[key])
                     try:
