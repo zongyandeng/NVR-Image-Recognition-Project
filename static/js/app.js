@@ -721,11 +721,11 @@ function toggleDrawingMode() {
 // 結束繪圖模式
 function endDrawingMode(shouldSavePoints = false) {
     isDrawingMode = false;
-    document.getElementById("monitor-screen-body").classList.remove("drawing-mode");
+    const screenBody = document.getElementById("monitor-screen-body");
+    if (screenBody) screenBody.classList.remove("drawing-mode");
     
     if (shouldSavePoints && tempFencePoints.length >= 3) {
         fencePoints = [...tempFencePoints];
-        document.getElementById("btn-save-fence").disabled = false;
     }
     
     tempFencePoints = [];
@@ -750,15 +750,29 @@ function drawFenceOverlay() {
         ctx.lineTo(tempFencePoints[i][0] * liveCanvas.width, tempFencePoints[i][1] * liveCanvas.height);
     }
     
-    // 繪製連接到滑鼠位置的輔助虛線
-    ctx.lineTo(mouseX, mouseY);
+    // 檢查是否已閉合（即最後一個點的座標與第一個點完全相同）
+    let isClosed = false;
+    if (tempFencePoints.length >= 4) {
+        const lastIdx = tempFencePoints.length - 1;
+        if (tempFencePoints[lastIdx][0] === tempFencePoints[0][0] && tempFencePoints[lastIdx][1] === tempFencePoints[0][1]) {
+            isClosed = true;
+        }
+    }
     
-    ctx.setLineDash([5, 5]); // 設定為虛線
-    ctx.stroke();
-    ctx.setLineDash([]);    // 還原為實線
+    // 若尚未閉合，則繪製連向滑鼠位置的輔助虛線，已閉合則直接閉合線條
+    if (!isClosed) {
+        ctx.lineTo(mouseX, mouseY);
+        ctx.setLineDash([5, 5]); // 設定為虛線
+        ctx.stroke();
+        ctx.setLineDash([]);    // 還原為實線
+    } else {
+        ctx.stroke();
+    }
     
-    // 繪製頂點圓圈
+    // 繪製頂點圓圈 (若是閉合圖形，最後一個重合點不重複繪製)
     tempFencePoints.forEach((pt, idx) => {
+        if (isClosed && idx === tempFencePoints.length - 1) return;
+        
         const ptX = pt[0] * liveCanvas.width;
         const ptY = pt[1] * liveCanvas.height;
         
@@ -806,13 +820,33 @@ liveCanvas.addEventListener("click", (e) => {
         const dist = Math.hypot(x - firstX, y - firstY);
         
         if (dist < 15) {
-            showToast("多邊形閉合成功", "圍欄劃定完成！可點擊『💾 儲存』將設定儲存生效。");
-            endDrawingMode(true);
+            // 首尾自動閉合：將起點座標深拷貝一份推入末尾，組成閉合多邊形
+            tempFencePoints.push([...tempFencePoints[0]]);
+            showToast("多邊形已自動閉合", "圍欄劃定完成！請點擊『💾 儲存』將設定儲存生效。");
+            
+            // 啟用儲存按鈕
+            const saveBtn = document.getElementById("btn-save-fence");
+            if (saveBtn) saveBtn.disabled = false;
+            
+            updateFenceStatusUI();
             return;
         }
     }
     
-    // 限制最大頂點數
+    // 限制最大頂點數 (閉合後也禁止再點擊加點)
+    let isAlreadyClosed = false;
+    if (tempFencePoints.length >= 4) {
+        const lastIdx = tempFencePoints.length - 1;
+        if (tempFencePoints[lastIdx][0] === tempFencePoints[0][0] && tempFencePoints[lastIdx][1] === tempFencePoints[0][1]) {
+            isAlreadyClosed = true;
+        }
+    }
+    
+    if (isAlreadyClosed) {
+        showToast("已完成繪製", "圍欄已閉合！請直接點擊『💾 儲存』或點擊『🧹 清除』重新劃定。", true);
+        return;
+    }
+    
     if (tempFencePoints.length >= 8) {
         showToast("點數達到上限", "為確保後端效能，圍欄最大支援 8 個頂點，請點擊紅色首點進行閉合。", true);
         return;
