@@ -1,8 +1,11 @@
 {
     "camera_source": "simulator",
+    "enable_fence": false,
+    "fence_polygon": [],
     "detection_threshold": 0.5,
     "detection_cooldown": 30,
     "recording_duration": 10,
+    "max_recording_duration": 30,
     "line_token": "",
     "discord_webhook": "",
     "email_smtp_server": "",
