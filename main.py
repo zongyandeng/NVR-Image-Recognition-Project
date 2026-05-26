@@ -65,10 +65,35 @@ async def get_settings_api():
     return JSONResponse(content=config.get_all())
 
 @app.post("/api/settings")
-async def update_settings_api(settings: SettingsUpdate):
-    """更新系統設定"""
-    config.update(settings.dict())
-    return JSONResponse(content={"status": "success", "message": "Settings updated successfully."})
+async def update_settings_api(request: Request):
+    """
+    更新系統設定
+    【安全防禦與極致除錯】：動態接收 JSON，手動解析，避免 Pydantic 靜態 Validation 錯誤導致 422 卡死，並提供詳盡日誌！
+    """
+    try:
+        body = await request.json()
+        logging.info(f"收到更新設定請求 payload: {body}")
+        
+        # 我們直接使用 Pydantic 進行防禦性驗證，若出錯則主動捕捉，列印出具體是哪個欄位失敗
+        try:
+            settings_obj = SettingsUpdate(**body)
+        except Exception as ve:
+            logging.error(f"Pydantic 校驗設定失敗: {ve}")
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": f"設定格式校驗失敗: {str(ve)}"}
+            )
+            
+        # 安全回寫設定
+        config.update(settings_obj.dict())
+        return JSONResponse(content={"status": "success", "message": "Settings updated successfully."})
+        
+    except Exception as e:
+        logging.error(f"更新設定路由異常: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"伺服器內部錯誤: {str(e)}"}
+        )
 
 @app.post("/api/test-alert")
 async def test_alert_api():

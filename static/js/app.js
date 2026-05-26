@@ -630,11 +630,12 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
             body: JSON.stringify(payload)
         });
         
+        const resData = await response.json();
         if (response.ok) {
             showToast("設定儲存成功", "系統參數與通知金鑰已成功持久化存檔。");
             loadSystemSettings(); // 重新讀取整理 UI
         } else {
-            showToast("儲存設定失敗", "背景回傳寫入失敗，請確認格式是否正確。", true);
+            showToast("儲存設定失敗", resData.message || "背景回傳寫入失敗，請確認格式是否正確。", true);
         }
     } catch (err) {
         console.error("儲存設定錯誤: ", err);
@@ -883,11 +884,12 @@ async function syncFenceSettings(enabled, polygon) {
             body: JSON.stringify(curSettings)
         });
         
+        const resData = await rPost.json();
         if (rPost.ok) {
             showToast("電子圍欄同步成功", "設定已寫入系統核心，即時生效！");
             loadSystemSettings(); // 重新整理前端顯示
         } else {
-            showToast("同步失敗", "寫入設定時伺服器拒絕請求。", true);
+            showToast("同步失敗", resData.message || "寫入設定時伺服器拒絕請求。", true);
         }
     } catch (err) {
         console.error("同步圍欄設定失敗:", err);
